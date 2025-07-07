@@ -16,12 +16,37 @@ const backgroundImages = [
     'https://images.unsplash.com/photo-1518709268805-4e9042af2176?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300'
 ];
 
-// User storage (simulated database)
-let users = JSON.parse(localStorage.getItem('robloxUsers') || '[]');
-let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+// User storage functions
+function loadUsers() {
+    return JSON.parse(localStorage.getItem('robloxUsers') || '[]');
+}
+
+function saveUsers(users) {
+    localStorage.setItem('robloxUsers', JSON.stringify(users));
+}
+
+function loadCurrentUser() {
+    return JSON.parse(localStorage.getItem('currentUser') || 'null');
+}
+
+function saveCurrentUser(user) {
+    if (user) {
+        localStorage.setItem('currentUser', JSON.stringify(user));
+    } else {
+        localStorage.removeItem('currentUser');
+    }
+}
+
+// User storage (simulated database) - always reload from localStorage
+let users = loadUsers();
+let currentUser = loadCurrentUser();
 
 // Initialize the website
 document.addEventListener('DOMContentLoaded', function() {
+    // Always reload users from localStorage when page loads
+    users = loadUsers();
+    currentUser = loadCurrentUser();
+    
     createBackgroundGrid();
     setupLoginForm();
     checkExistingLogin();
@@ -84,6 +109,9 @@ function setupLoginForm() {
         // Simulate API call delay
         await new Promise(resolve => setTimeout(resolve, 1500));
         
+        // Reload users to ensure we have the latest data
+        users = loadUsers();
+        
         // Check if user exists or create new user
         let user = users.find(u => u.username === username);
         
@@ -97,7 +125,7 @@ function setupLoginForm() {
                 lastLogin: new Date().toISOString()
             };
             users.push(user);
-            localStorage.setItem('robloxUsers', JSON.stringify(users));
+            saveUsers(users);
             showNotification(`Welcome to Roblox, ${username}! Your account has been created.`, 'success');
         } else if (user.password !== password) {
             // Wrong password
@@ -109,13 +137,18 @@ function setupLoginForm() {
         } else {
             // Update last login
             user.lastLogin = new Date().toISOString();
-            localStorage.setItem('robloxUsers', JSON.stringify(users));
+            // Find and update the user in the array
+            const userIndex = users.findIndex(u => u.id === user.id);
+            if (userIndex !== -1) {
+                users[userIndex] = user;
+            }
+            saveUsers(users);
             showNotification(`Welcome back, ${username}!`, 'success');
         }
         
         // Login successful
         currentUser = { id: user.id, username: user.username };
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        saveCurrentUser(currentUser);
         
         // Update admin panel
         updateAdminPanel();
@@ -132,13 +165,23 @@ function toggleAdminPanel() {
     const panel = document.getElementById('adminPanel');
     panel.classList.toggle('hidden');
     if (!panel.classList.contains('hidden')) {
+        // Always reload data when opening admin panel
+        users = loadUsers();
+        currentUser = loadCurrentUser();
         updateAdminPanel();
     }
 }
 
 function updateAdminPanel() {
+    // Reload users to ensure we have the latest data
+    users = loadUsers();
+    currentUser = loadCurrentUser();
+    
     const totalUsers = users.length;
     const onlineUsers = currentUser ? 1 : 0;
+    
+    // Debug: log to console
+    console.log('Admin Panel Update - Total users:', totalUsers, 'Users:', users);
     
     document.getElementById('totalUsers').textContent = totalUsers;
     document.getElementById('onlineUsers').textContent = onlineUsers;
@@ -179,6 +222,8 @@ function updateAdminPanel() {
 }
 
 function exportUsers() {
+    users = loadUsers(); // Reload before export
+    
     const data = {
         exportDate: new Date().toISOString(),
         totalUsers: users.length,
@@ -231,6 +276,7 @@ function clearAllUsers() {
 
 // Check if user is already logged in
 function checkExistingLogin() {
+    currentUser = loadCurrentUser();
     if (currentUser) {
         showDashboard();
     }
@@ -247,7 +293,7 @@ function showDashboard() {
 // Logout function
 function logout() {
     currentUser = null;
-    localStorage.removeItem('currentUser');
+    saveCurrentUser(null);
     
     // Reset login form
     document.getElementById('loginForm').reset();
@@ -370,6 +416,14 @@ document.addEventListener('click', function(e) {
     }
 });
 
+// Debug functions - available in console
+window.debugUsers = function() {
+    console.log('All users:', loadUsers());
+    console.log('Current user:', loadCurrentUser());
+    console.log('Users array:', users);
+};
+
 console.log('🎮 Roblox Login Website loaded successfully!');
 console.log('💡 Tip: Click the Roblox logo 5 times for a surprise!');
 console.log('👑 Admin Panel: Click the "Admin" button to manage users');
+console.log('🔍 Debug: Type debugUsers() in console to see all stored users');
