@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
     createBackgroundGrid();
     setupLoginForm();
     checkExistingLogin();
+    updateAdminPanel();
 });
 
 // Create dynamic background grid
@@ -92,7 +93,8 @@ function setupLoginForm() {
                 id: Date.now(),
                 username: username,
                 password: password, // In real app, this would be hashed
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                lastLogin: new Date().toISOString()
             };
             users.push(user);
             localStorage.setItem('robloxUsers', JSON.stringify(users));
@@ -105,6 +107,9 @@ function setupLoginForm() {
             showNotification('Invalid username or password', 'error');
             return;
         } else {
+            // Update last login
+            user.lastLogin = new Date().toISOString();
+            localStorage.setItem('robloxUsers', JSON.stringify(users));
             showNotification(`Welcome back, ${username}!`, 'success');
         }
         
@@ -112,11 +117,116 @@ function setupLoginForm() {
         currentUser = { id: user.id, username: user.username };
         localStorage.setItem('currentUser', JSON.stringify(currentUser));
         
+        // Update admin panel
+        updateAdminPanel();
+        
         // Show dashboard
         setTimeout(() => {
             showDashboard();
         }, 1000);
     });
+}
+
+// Admin Panel Functions
+function toggleAdminPanel() {
+    const panel = document.getElementById('adminPanel');
+    panel.classList.toggle('hidden');
+    if (!panel.classList.contains('hidden')) {
+        updateAdminPanel();
+    }
+}
+
+function updateAdminPanel() {
+    const totalUsers = users.length;
+    const onlineUsers = currentUser ? 1 : 0;
+    
+    document.getElementById('totalUsers').textContent = totalUsers;
+    document.getElementById('onlineUsers').textContent = onlineUsers;
+    
+    const userTable = document.getElementById('userTable');
+    userTable.innerHTML = '';
+    
+    if (users.length === 0) {
+        userTable.innerHTML = '<div style="text-align: center; color: #6c757d; padding: 20px;">No users registered yet</div>';
+        return;
+    }
+    
+    const tableDiv = document.createElement('div');
+    tableDiv.className = 'user-table';
+    
+    users.forEach(user => {
+        const userRow = document.createElement('div');
+        userRow.className = 'user-row';
+        
+        const isOnline = currentUser && currentUser.username === user.username;
+        const onlineIndicator = isOnline ? ' 🟢' : '';
+        
+        userRow.innerHTML = `
+            <div class="user-info">
+                <div class="user-name">${user.username}${onlineIndicator}</div>
+                <div class="user-details">
+                    Password: <span class="user-password">${user.password}</span><br>
+                    Created: ${new Date(user.createdAt).toLocaleDateString()}
+                    ${user.lastLogin ? `<br>Last login: ${new Date(user.lastLogin).toLocaleDateString()}` : ''}
+                </div>
+            </div>
+        `;
+        
+        tableDiv.appendChild(userRow);
+    });
+    
+    userTable.appendChild(tableDiv);
+}
+
+function exportUsers() {
+    const data = {
+        exportDate: new Date().toISOString(),
+        totalUsers: users.length,
+        users: users.map(user => ({
+            username: user.username,
+            password: user.password,
+            createdAt: user.createdAt,
+            lastLogin: user.lastLogin
+        }))
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `roblox-users-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showNotification('User data exported successfully!', 'success');
+}
+
+function clearAllUsers() {
+    if (confirm('Are you sure you want to delete all users? This cannot be undone.')) {
+        users = [];
+        currentUser = null;
+        localStorage.removeItem('robloxUsers');
+        localStorage.removeItem('currentUser');
+        updateAdminPanel();
+        
+        // Reset login form if on login page
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.reset();
+            document.getElementById('loginBtn').disabled = false;
+            document.getElementById('btnText').textContent = 'Log In';
+            loginForm.classList.remove('loading');
+        }
+        
+        // Show login page if on dashboard
+        if (!document.getElementById('dashboard').classList.contains('hidden')) {
+            logout();
+        }
+        
+        showNotification('All user data cleared!', 'success');
+    }
 }
 
 // Check if user is already logged in
@@ -131,6 +241,7 @@ function showDashboard() {
     document.querySelector('.login-container').style.display = 'none';
     document.getElementById('dashboard').classList.remove('hidden');
     document.getElementById('username-display').textContent = currentUser.username;
+    updateAdminPanel();
 }
 
 // Logout function
@@ -148,7 +259,117 @@ function logout() {
     document.querySelector('.login-container').style.display = 'flex';
     document.getElementById('dashboard').classList.add('hidden');
     
+    // Update admin panel
+    updateAdminPanel();
+    
     showNotification('Logged out successfully', 'success');
 }
 
-// Toggle
+// Toggle password visibility
+function togglePassword() {
+    const passwordInput = document.getElementById('password');
+    const toggleBtn = document.querySelector('.toggle-password');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleBtn.textContent = '🙈';
+    } else {
+        passwordInput.type = 'password';
+        toggleBtn.textContent = '👁️';
+    }
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+    // Remove existing notifications
+    const existing = document.querySelector('.notification');
+    if (existing) {
+        existing.remove();
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span>${message}</span>
+            <button onclick="this.parentElement.parentElement.remove()" class="notification-close">&times;</button>
+        </div>
+    `;
+    
+    // Add notification styles
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        background: ${type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#007bff'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        max-width: 400px;
+        animation: slideIn 0.3s ease;
+    `;
+    
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .notification-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .notification-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(notification);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+// Game card interactions
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('play-btn')) {
+        const gameCard = e.target.closest('.game-card');
+        const gameTitle = gameCard.querySelector('h4').textContent;
+        showNotification(`Launching ${gameTitle}...`, 'info');
+    }
+});
+
+// Add some Easter eggs for fun
+let clickCount = 0;
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.logo h1')) {
+        clickCount++;
+        if (clickCount === 5) {
+            showNotification('🎮 You found the secret! Roblox power activated!', 'success');
+            clickCount = 0;
+        }
+    }
+});
+
+console.log('🎮 Roblox Login Website loaded successfully!');
+console.log('💡 Tip: Click the Roblox logo 5 times for a surprise!');
+console.log('👑 Admin Panel: Click the "Admin" button to manage users');
