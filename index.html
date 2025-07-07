@@ -12,6 +12,37 @@
         <div class="gaming-grid" id="backgroundGrid"></div>
     </div>
     
+    <!-- Admin Panel Toggle -->
+    <div class="admin-toggle" onclick="toggleAdminPanel()">👑 Admin</div>
+    
+    <!-- Admin Panel -->
+    <div id="adminPanel" class="admin-panel hidden">
+        <div class="admin-header">
+            <h3>User Database</h3>
+            <button onclick="toggleAdminPanel()" class="close-btn">×</button>
+        </div>
+        <div class="admin-content">
+            <div class="admin-stats">
+                <div class="stat-card">
+                    <h4>Total Users</h4>
+                    <span id="totalUsers">0</span>
+                </div>
+                <div class="stat-card">
+                    <h4>Currently Online</h4>
+                    <span id="onlineUsers">0</span>
+                </div>
+            </div>
+            <div class="user-list">
+                <h4>All Users</h4>
+                <div id="userTable"></div>
+            </div>
+            <div class="admin-actions">
+                <button onclick="exportUsers()" class="export-btn">Export Users</button>
+                <button onclick="clearAllUsers()" class="clear-btn">Clear All Users</button>
+            </div>
+        </div>
+    </div>
+    
     <div class="login-container">
         <div class="login-box">
             <div class="logo">
